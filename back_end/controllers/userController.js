@@ -1,6 +1,8 @@
 import AppError from '../utilities/error.utils.js';
 import User from '../model/userSchema.js';
 import bcrypt from 'bcryptjs';
+import uploadToCloudinary from '../cloudinary/cloudinary.js';
+import fs from 'fs';
 
 const cookieOptions={
     maxAge: 7*24*60*60*1000,
@@ -21,12 +23,42 @@ const signup= async (req, res, next)=>{
         }
     
         const encryptedPassword=await bcrypt.hash(password,12);
-        console.log(encryptedPassword)
+        // console.log(encryptedPassword)
         const registeredUser= await User.create({
             fullName,
             email,
-            password:encryptedPassword
+            password:encryptedPassword,
+            avatar:{
+                public_id:email,
+                secure_url:'invalid_url'
+            }
         })
+
+        console.log(req.file);
+        // if(req.file){
+        //     try{
+        //     const result=await cloudinary.v2.uploader.upload(req.file.path);
+        //     console.log(result);
+        //     if(result){
+        //         registeredUser.avatar.public_id=result.public_id;
+        //         registeredUser.avatar.secure_url=result.secure_url;
+        //         fs.unlinkSync(req.file.path)
+        //     }
+        //     }catch(error){
+        //       return next(new AppError(error || `File is failed to load in cloudinary`));
+        //     }
+        // }
+        const result=uploadToCloudinary(req.file.path);
+
+        
+        if(result){
+            registeredUser.avatar.public_id = result.public_id;
+            registeredUser.avatar.secure_url= result.secure_url;
+            
+            //Remove file from server
+            // fs.unlinkSync(req.file.path);
+        }
+        console.log(result);
 
         res.status(200).json({
             success:true,
@@ -36,7 +68,7 @@ const signup= async (req, res, next)=>{
         res.status(400).json({
             success:false,
             message:"Sign up fail",
-            Error: error
+            Error: error.message
         })
     }
 }

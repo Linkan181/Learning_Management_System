@@ -27,22 +27,22 @@ const userSchema= new mongoose.Schema({
         required: [true, "Password is required."],
         minLenght:[8, "Password at least contains 8 character"],
         select: false
-    }
-    // avatar:{
-    //     public_id:{
-    //         type:"String"
-    //     },
-    //     secure_url:{
-    //         type:"String"
-    //     }
-    // },
-    // role:{
-    //     type:'String',
-    //     enum:['USER','ADMIN'],
-    //     default:'USER'
-    // },
-    // forgotPasswordToken: String,
-    // fogotPasswordExpiry:Date
+    },
+    avatar:{
+        public_id:{
+            type:"String"
+        },
+        secure_url:{
+            type:"String"
+        }
+    },
+    role:{
+        type:'String',
+        enum:['USER','ADMIN'],
+        default:'USER'
+    },
+    forgotPasswordToken: String,
+    fogotPasswordExpiry:Date
 },{
     timestamps:true
 });
