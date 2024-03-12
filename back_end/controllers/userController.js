@@ -3,6 +3,8 @@ import User from '../model/userSchema.js';
 import bcrypt from 'bcryptjs';
 import uploadToCloudinary from '../cloudinary/cloudinary.js';
 import fs from 'fs';
+import sendEmail from '../utilities/sendEmail.js'
+import crypto from 'crypto'
 
 const cookieOptions={
     maxAge: 7*24*60*60*1000,
@@ -134,4 +136,82 @@ const veiwProfile=async (req,res)=>{
 
 }
 
-export { signup, login , logout, veiwProfile};
+
+const forgotPassword=async(req,res)=>{
+    const {email}=req.body;
+
+    if(!email){
+        return next(new AppError("Email-id required.",400));
+    }
+
+    const user=await User.findOne({email});
+    if(!user){
+        return next(new AppError("Email is not registered.",400))
+    }
+
+    const resetToken= await user.generateResetpasswordToken();
+
+    await user.save();
+
+    const resetPasswordURL=`${process.env.PRONT_END_URL}/resetpassword/${resetToken}`;
+    const message=resetPasswordURL;
+    try {
+        const subject='Hello';
+        
+        await sendEmail(email,subject,message);
+
+        res.status(200).json({
+            success:true,
+            message:`Reset password token is sent to ${email} successfully.`
+        })
+    } catch (error) {
+
+        user.fogotPasswordToken=undefined;
+        user.forgotPasswordExpiry=undefined;
+        return next(new AppError(error.message,500));
+    }
+    
+
+
+}
+
+const resetPassword=async(req,res,next)=>{
+
+    try {
+        
+        const { token }=req.params;
+
+        console.log(token);
+     
+        const {password}=req.body;
+     
+        const encrypted_resetToken=crypto.createHash('sha256').update(token).digest('hex');
+
+        console.log(encrypted_resetToken);
+     
+        const user =await User.findOne({ forgotPasswordToken : encrypted_resetToken });
+
+        console.log(user);
+     
+        if(!user){
+         return next(new AppError('Token is invalid or Expire. Please try again',400));
+        }
+     
+        user.password=password;
+        user.forgotPasswordToken=undefined;
+        user.fogotPasswordExpiry=undefined;
+     
+        await user.save();
+
+        res.status(200).json({
+            success:true,
+            message:"Password is updated successfully"
+        })
+    } catch (error) {
+        console.log(error);
+        return next(new AppError("internal server error",500));
+    }
+
+}
+
+export { signup, login , logout, veiwProfile, forgotPassword, resetPassword};

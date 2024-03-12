@@ -4,13 +4,15 @@ import upload from '../middleware/multer.middleware.js';
 
 const router=express.Router();
 
-import {signup, login, logout, veiwProfile} from '../controllers/userController.js';
+import {signup, login, logout, veiwProfile, forgotPassword, resetPassword} from '../controllers/userController.js';
 
 
 router.post('/signup',upload.single("avatar"),signup);
 router.post('/login',login);
 router.get('/logout',logout);
 router.get('/me',isLogedIn,veiwProfile);
+router.post('/forgotpassword',forgotPassword);
+router.post('/resetpassword/:token',resetPassword);
 
 
 export default router;
