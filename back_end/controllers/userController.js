@@ -5,6 +5,7 @@ import uploadToCloudinary from '../cloudinary/cloudinary.js';
 import fs from 'fs';
 import sendEmail from '../utilities/sendEmail.js'
 import crypto from 'crypto'
+import cloudinary from 'cloudinary';
 
 const cookieOptions={
     maxAge: 7*24*60*60*1000,
@@ -75,7 +76,7 @@ const signup= async (req, res, next)=>{
     }
 }
 
-const login=async(req,res)=>{
+const login=async(req,res,next)=>{
 
     try {
         
@@ -108,7 +109,7 @@ const login=async(req,res)=>{
     }
 }
 
-const logout=(req,res)=>{
+const logout=(req,res,next)=>{
     try {
         res.cookie("token",null,{
             secure:true,
@@ -125,7 +126,7 @@ const logout=(req,res)=>{
     }
 }
 
-const veiwProfile=async (req,res)=>{
+const veiwProfile=async (req,res,next)=>{
      const userId=req.user.id;
      const user=await User.findOne({userId});
 
@@ -137,7 +138,7 @@ const veiwProfile=async (req,res)=>{
 }
 
 
-const forgotPassword=async(req,res)=>{
+const forgotPassword=async(req,res,next)=>{
     const {email}=req.body;
 
     if(!email){
@@ -179,19 +180,19 @@ const resetPassword=async(req,res,next)=>{
 
     try {
         
-        const { token }=req.params;
+        const { resettoken }=req.params;
 
-        console.log(token);
+        // console.log(token);
      
         const {password}=req.body;
      
-        const encrypted_resetToken=crypto.createHash('sha256').update(token).digest('hex');
+        const encrypted_resetToken=crypto.createHash('sha256').update(resettoken).digest('hex');
 
-        console.log(encrypted_resetToken);
+        // console.log(encrypted_resetToken);
      
         const user =await User.findOne({ forgotPasswordToken : encrypted_resetToken });
 
-        console.log(user);
+        // console.log(user);
      
         if(!user){
          return next(new AppError('Token is invalid or Expire. Please try again',400));
@@ -214,4 +215,82 @@ const resetPassword=async(req,res,next)=>{
 
 }
 
-export { signup, login , logout, veiwProfile, forgotPassword, resetPassword};
+const changePassword=async(req,res,next)=>{
+    const { oldpassword, newpassword}=req.body;
+    const {id}=req.user;
+
+    if(!oldpassword || ! newpassword){
+        return next(new AppError("All fields are required.",400));
+    }
+
+    const user= await User.findById(id).select("+password");
+
+    if(!user){
+        return next(new AppError("User does not exist.",400));
+    }
+
+    const isPasswordValid= await user.comparePassword(oldpassword);
+
+    if(!isPasswordValid){
+       return next(new AppError("Old password is invalid",400));
+    }
+    
+    user.password=newpassword;
+
+    await user.save();
+
+    user.password=undefined; 
+    /*
+    Assigning undefined to "user.password" after saving the new password serves as a security measure to ensure that the password is not lingering around in memory longer than necessary.
+    After the password is saved, assigning undefined to user.password clears the password from the memory of the current user object. This is done to minimize the risk of exposing sensitive data if there is any unexpected leakage of memory.
+    */
+
+    res.status(200).json({
+        success:true,
+        message:"Password changed successfully."
+    })
+}
+
+const updateProfile=async (req,res,next)=>{
+  const {fullName}=req.body;
+  const {id}= req.user.id;
+
+  if(!fullName){
+    return next(new AppError("Please fill your new name"));
+  }
+
+  const user= await User.findById(id);
+
+  if(!user){
+    return next(new AppError("User not exist"));
+  }
+
+  user.fullName=fullName;
+  
+  if(req.file){
+    await cloudinary.v2.uploader.destroy(user.avatar.public_id);
+    try {
+        const result=uploadToCloudinary(req.file.path);
+
+        
+        if(result){
+            user.avatar.public_id = result.public_id;
+            user.avatar.secure_url= result.secure_url;
+            
+            //Remove file from server
+            // fs.unlinkSync(req.file.path);
+        }
+        
+    } catch (error) {
+        return next(new AppError("Avatar upload failed",400));
+    }
+  }
+  await user.save();
+
+   res.status(200).json({
+    success:true,
+    message:"user data updated successfully."
+   })
+}
+
+export { signup, login , logout, veiwProfile, forgotPassword, resetPassword, changePassword,updateProfile};
